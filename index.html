@@ -18,7 +18,7 @@
 
   <!-- Public balance visible to all -->
   <div id="publicBalanceSection">
-    <p>Balance: <span id="balance">Loading...</span></p>
+    <p>Balance for <strong><span id="cardIdDisplay">Loading...</span></strong>: <span id="balance">Loading...</span></p>
   </div>
 
   <!-- Admin login -->
@@ -62,7 +62,13 @@
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const database = firebase.database();
-    const cardId = "card001";
+
+    // Get cardId from URL query params or default to "card001"
+    const urlParams = new URLSearchParams(window.location.search);
+    const cardId = urlParams.get('cardId') || 'card001';
+
+    // Display cardId on the page
+    document.getElementById('cardIdDisplay').textContent = cardId;
 
     // Elements
     const balanceSpan = document.getElementById("balance");
@@ -72,7 +78,7 @@
     const updateStatus = document.getElementById("updateStatus");
     const newBalanceInput = document.getElementById("newBalance");
 
-    // Show balance to all immediately
+    // Show balance to all immediately for the selected card
     database.ref(`cards/${cardId}/balance`).on("value", snapshot => {
       const balance = snapshot.val() || 0;
       balanceSpan.textContent = balance;
