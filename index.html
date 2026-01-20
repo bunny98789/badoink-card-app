@@ -2,20 +2,26 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Card Balance - Admin</title>
+  <title>Card Balance - Public & Admin</title>
   <style>
     body { font-family: Arial, sans-serif; max-width: 400px; margin: 30px auto; padding: 0 15px; }
     label { display: block; margin: 8px 0 4px; }
     input { width: 100%; padding: 6px; box-sizing: border-box; }
     button { margin-top: 10px; padding: 8px 12px; font-size: 1rem; cursor: pointer; }
     #updateStatus, #loginStatus { margin-top: 12px; font-weight: bold; }
-    #balanceSection, #editSection { display: none; }
+    #adminSection { display: none; margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px; }
   </style>
 </head>
 <body>
 
   <h1>Card Balance</h1>
 
+  <!-- Public balance visible to all -->
+  <div id="publicBalanceSection">
+    <p>Balance: <span id="balance">Loading...</span></p>
+  </div>
+
+  <!-- Admin login -->
   <div id="loginSection">
     <h2>Admin Login</h2>
     <label for="emailInput">Email:</label>
@@ -26,11 +32,8 @@
     <p id="loginStatus"></p>
   </div>
 
-  <div id="balanceSection">
-    <p>Balance: <span id="balance">Loading...</span></p>
-  </div>
-
-  <div id="editSection">
+  <!-- Admin balance editing section, hidden until login -->
+  <div id="adminSection">
     <h2>Edit Balance</h2>
     <label for="newBalance">New Balance:</label>
     <input type="number" id="newBalance" min="0" />
@@ -44,6 +47,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <script>
+    // Your Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyDGNpexTfG3WrqMFp63tF3n6czKWXxhOQc",
       authDomain: "badoinks-cards.firebaseapp.com",
@@ -54,75 +58,69 @@
       appId: "1:868196711787:web:b21722cff3c9a4816f602e"
     };
 
+    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
-
     const auth = firebase.auth();
     const database = firebase.database();
     const cardId = "card001";
 
     // Elements
+    const balanceSpan = document.getElementById("balance");
     const loginSection = document.getElementById("loginSection");
-    const balanceSection = document.getElementById("balanceSection");
-    const editSection = document.getElementById("editSection");
+    const adminSection = document.getElementById("adminSection");
     const loginStatus = document.getElementById("loginStatus");
     const updateStatus = document.getElementById("updateStatus");
-    const balanceSpan = document.getElementById("balance");
     const newBalanceInput = document.getElementById("newBalance");
 
-    // Login button handler
+    // Show balance to all immediately
+    database.ref(`cards/${cardId}/balance`).on("value", snapshot => {
+      const balance = snapshot.val() || 0;
+      balanceSpan.textContent = balance;
+    });
+
+    // Login button click
     document.getElementById("loginBtn").addEventListener("click", () => {
       const email = document.getElementById("emailInput").value;
       const password = document.getElementById("passwordInput").value;
+      loginStatus.style.color = "black";
       loginStatus.textContent = "Logging in...";
       auth.signInWithEmailAndPassword(email, password)
-  .then(userCredential => {
-    const userEmail = userCredential.user.email;
-    console.log("Logged in as:", userEmail);  // <-- This logs the email to console
-    
-    loginStatus.textContent = "Logged in successfully!";
-    loginSection.style.display = "none";
-    balanceSection.style.display = "block";
-    editSection.style.display = "block";
-    startListeningBalance();
-  })
-  .catch(error => {
-    loginStatus.textContent = "Login failed: " + error.message;
-    loginStatus.style.color = "red";
-  });
-
-    });
-
-    // Listen for balance changes
-    function startListeningBalance() {
-      database.ref(`cards/${cardId}/balance`).on("value", snapshot => {
-        const balance = snapshot.val() || 0;
-        balanceSpan.textContent = balance;
-      });
-    }
-
-    // Update balance button
-    document.getElementById("updateBalanceBtn").addEventListener("click", () => {
-      const newBalance = Number(newBalanceInput.value);
-      if (isNaN(newBalance) || newBalance < 0) {
-        updateStatus.textContent = "Please enter a valid non-negative number.";
-        updateStatus.style.color = "red";
-        return;
-      }
-      updateStatus.textContent = "Updating...";
-      database.ref(`cards/${cardId}/balance`).set(newBalance)
-        .then(() => {
-          updateStatus.textContent = "Balance updated successfully!";
-          updateStatus.style.color = "green";
-          newBalanceInput.value = "";
+        .then(userCredential => {
+          loginStatus.textContent = "Logged in successfully!";
+          loginSection.style.display = "none";
+          adminSection.style.display = "block";
         })
         .catch(error => {
-          updateStatus.textContent = "Error updating balance: " + error.message;
-          updateStatus.style.color = "red";
+          loginStatus.style.color = "red";
+          loginStatus.textContent = "Login failed: " + error.message;
         });
     });
 
-    // Optionally, sign out on page load for testing
+    // Update balance button click
+    document.getElementById("updateBalanceBtn").addEventListener("click", () => {
+      const newBalance = Number(newBalanceInput.value);
+      if (isNaN(newBalance) || newBalance < 0) {
+        updateStatus.style.color = "red";
+        updateStatus.textContent = "Please enter a valid non-negative number.";
+        return;
+      }
+      updateStatus.style.color = "black";
+      updateStatus.textContent = "Updating...";
+      database.ref(`cards/${cardId}/balance`).set(newBalance)
+        .then(() => {
+          updateStatus.style.color = "green";
+          updateStatus.textContent = "Balance updated successfully!";
+          newBalanceInput.value = "";
+        })
+        .catch(error => {
+          updateStatus.style.color = "red";
+          updateStatus.textContent = "Error updating balance: " + error.message;
+        });
+    });
+
+    // Optional: sign out admin on page load for testing
     auth.signOut();
+
   </script>
 </body>
 </html>
