@@ -68,7 +68,13 @@
     const cardId = urlParams.get('cardId') || 'card001';
 
     // Display cardId on the page
-    document.getElementById('cardIdDisplay').textContent = cardId;
+     const cardNameSpan = document.getElementById("cardIdDisplay");
+
+     database.ref(`cards/${cardId}/name`).on("value", snapshot => {
+     const cardName = snapshot.val();
+     cardNameSpan.textContent = cardName || cardId; // fallback if no name
+     });
+
 
     // Elements
     const balanceSpan = document.getElementById("balance");
