@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>SHOP</title>
+
+    <style>
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        #balanceBox {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 1.2rem;
+        }
+
+        #shopItems {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+        }
+
+        .shopItem {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .shopItem h3 {
+            margin-top: 0;
+        }
+
+        button {
+            padding: 8px 12px;
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .buyBtn {
+            background: #2ecc71;
+            color: white;
+        }
+
+        .buyBtn:hover {
+            background: #27ae60;
+        }
+
+        #status {
+            margin-top: 20px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+    </style>
+</head>
+
+<body>
+
+    <h1>SHOP</h1>
+
+   <div id="cardLogin">
+    <h3>Enter Card ID</h3>
+
+    <input id="cardIdInput" placeholder="e.g. card001" />
+
+    <input id="cardPinInput" type="password" placeholder="PIN" />
+
+    <button onclick="loadCard()">
+        Load Card
+    </button>
+</div>
+
+    <div id="balanceBox" style="display:none;">
+        Balance: <span id="balance">Loading...</span>
+    </div>
+
+    <div id="shopItems" style="display:none;"></div>
+
+    <p id="status"></p>
+
+    <!-- Firebase -->
+
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+    <script>
+
+        // FIREBASE CONFIG
+
+       const firebaseConfig = {
+  apiKey: "AIzaSyDGNpexTfG3WrqMFp63tF3n6czKWXxhOQc",
+  authDomain: "badoinks-cards.firebaseapp.com",
+  databaseURL: "https://badoinks-cards-default-rtdb.firebaseio.com",
+  projectId: "badoinks-cards",
+  storageBucket: "badoinks-cards.firebasestorage.app",
+  messagingSenderId: "868196711787",
+  appId: "1:868196711787:web:b21722cff3c9a4816f602e"
+};
+
+        firebase.initializeApp(firebaseConfig);
+
+        const database = firebase.database();
+
+        // CARD ID
+
+        let cardId = null;
+        
+        // ELEMENTS
+
+        const balanceSpan = document.getElementById("balance");
+
+        const shopItemsDiv = document.getElementById("shopItems");
+
+        const statusText = document.getElementById("status");
+
+        function startCardListeners() {
+            console.log("EVENT REACHED");
+        // LOAD BALANCE
+
+        database.ref(`cards/${cardId}/balance`).on("value", snapshot => {
+
+            const balance = snapshot.val() || 0;
+
+            balanceSpan.textContent = balance;
+
+        });
+
+        // LOAD SHOP ITEMS
+
+        database.ref("Shop").on("value", snapshot => {
+
+            const items = snapshot.val();
+
+            shopItemsDiv.innerHTML = "";
+           
+           console.log("SHOP RAW DATA:", items);
+
+            for (const itemId in items) {
+
+                const item = items[itemId];
+
+                if (!item) continue;
+
+                const div = document.createElement("div");
+
+                div.className = "shopItem";
+
+                div.innerHTML = `
+                    <h3>${item.Name}</h3>
+
+                    <p>Price: ${item.Price}</p>
+
+                    <button class="buyBtn"
+                    onclick="buyItem('${itemId}')">
+
+                        Buy
+
+                    </button>
+                `;
+
+                shopItemsDiv.appendChild(div);
+
+            }
+
+        });
+    }
+
+       async function loadCard() {
+
+    const inputId = document.getElementById("cardIdInput").value.trim();
+    const inputPin = document.getElementById("cardPinInput").value.trim();
+
+    if (!inputId || !inputPin) {
+        alert("Enter card ID and PIN");
+        return;
+    }
+
+    // GET CARD DATA FROM FIREBASE
+    const snapshot = await database.ref(`cards/${inputId}`).get();
+
+    if (!snapshot.exists()) {
+        alert("Card not found");
+        return;
+    }
+
+    const data = snapshot.val();
+
+    // CHECK PIN
+    if (String(data.pin) !== String(inputPin)) {
+        alert("Wrong PIN");
+        return;
+    }
+
+    // SUCCESS → LOGIN
+    cardId = inputId;
+
+    document.getElementById("cardLogin").style.display = "none";
+    document.getElementById("balanceBox").style.display = "block";
+    document.getElementById("shopItems").style.display = "grid";
+
+    startCardListeners();
+}
+
+        // BUY ITEM
+
+        async function buyItem(itemId) {
+
+            if (!cardId) {
+                statusText.style.color = "red";
+                statusText.textContent = "Load a card first.";
+                return;
+            }
+
+            statusText.style.color = "black";
+
+            statusText.textContent = "Processing purchase...";
+
+            try {
+
+                // GET BALANCE
+
+                const balanceSnapshot = await database
+                    .ref(`cards/${cardId}/balance`)
+                    .get();
+
+                const balance = balanceSnapshot.val() || 0;
+
+                // GET ITEM
+
+                const itemSnapshot = await database
+                    .ref(`Shop/${itemId}`)
+                    .get();
+
+                const item = itemSnapshot.val();
+
+                if (!item) {
+
+                    statusText.style.color = "red";
+
+                    statusText.textContent = "Item not found.";
+
+                    return;
+
+                }
+
+                // CHECK MONEY
+
+                if (balance < item.Price) {
+
+                    statusText.style.color = "red";
+
+                    statusText.textContent =
+                        "Not enough balance.";
+
+                    return;
+
+                }
+
+                // SUBTRACT MONEY
+
+                const newBalance = balance - item.Price;
+
+                await database
+                    .ref(`cards/${cardId}/balance`)
+                    .set(newBalance);
+
+                // SAVE PURCHASE
+
+                await database
+                    .ref(`cards/${cardId}/purchases`)
+                    .push({
+
+                        item: item.Name,
+                        price: item.Price,
+                        time: Date.now()
+
+                    });
+
+                statusText.style.color = "green";
+
+                statusText.textContent =
+                    `Purchased ${item.Name}!`;
+
+            }
+
+            catch (error) {
+
+                statusText.style.color = "red";
+
+                statusText.textContent =
+                    "Error: " + error.message;
+
+            }
+
+        }
+
+    </script>
+
+</body>
+</html>
